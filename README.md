@@ -26,12 +26,12 @@ Every EQW packet starts with a fixed prefix and includes a flag-driven header fo
 
 ## Flag Byte Semantics
 
-| Bit Pattern | Meaning                     | Notes                            |
-|-------------|-----------------------------|----------------------------------|
-| `0x00`      | **Get** request             | e.g., "What is your battery?"    |
-| `0x01`      | **Reply**                   | e.g., "Battery = 78%"            |
-| `0x02`      | **Set** command             | e.g., "Set brightness to 200"    |
-| `0x03`      | **Set + Ack**               | e.g., "Set brightness to 200, confirm receipt" |
+| Value | Meaning                     | Notes                            |
+|--------|-----------------------------|----------------------------------|
+| `0x00` | **Get** request             | e.g., "What is your battery?"    |
+| `0x01` | **Reply**                   | e.g., "Battery = 78%"            |
+| `0x02` | **Set** command             | e.g., "Set brightness to 200"    |
+| `0x03` | **Set + Ack**               | e.g., "Set brightness to 200, confirm receipt" |
 
 > Devices **must not** treat flags > 3 as valid unless explicitly documented in future protocol extensions.
 
@@ -42,15 +42,17 @@ Every EQW packet starts with a fixed prefix and includes a flag-driven header fo
 | Command ID | Meaning                     |
 |------------|-----------------------------|
 | `0x00–0xFE`| User-defined command space   |
-| `0xFF`     | Reserved system command:
-   - `QueryDevices` (flag = 0)
-   - `SelfReport` (flag = 1)
+| `0xFF`     | Reserved system command: `QueryDevices` / `SelfReport` based on flag
 
 ---
 
 ## System Commands: `0xFF` (QueryDevices & SelfReport)
 
 ### `QueryDevices` — Command ID `0xFF`, Flag = `0x00`
+
+Allows querying all devices or filtering by Device ID pairs (A+B) and/or specific MAC addresses.
+
+#### Payload Format
 
 | Byte Index | Field            | Type       | Notes                      |
 |------------|------------------|------------|----------------------------|
@@ -59,23 +61,29 @@ Every EQW packet starts with a fixed prefix and includes a flag-driven header fo
 | ..         | MAC Count        | `uint8_t`  | M MACs follow             |
 | ..         | MACs             | `uint8_t[M*6]` | Each 6 bytes             |
 
-If both lists are empty, the query is broadcast to all devices.
-
-#### Example: query all torches (A=0x01, B=0x02), no MACs
+#### Example A: query all torches (A=0x01, B=0x02), no MACs
 ```
-Command ID: 0xFF
-Flag: 0x00
-Request ID: 0x1234
-Payload:
-01 // 1 device type
-01 02 // Device ID (creator/device)
-00 // 0 MACs
+Full Payload:
+  0x01       // 1 device type
+  0x01 0x02  // Device ID: A=0x01, B=0x02
+  0x00       // 0 MACs
 ```
 
+#### Example B: query specific MAC 0xB0:0xB1:0xB2:0xB3:0xB4:0xB5
+```
+Full Payload:
+  0x00                             // 0 device types
+  0x01                             // 1 MAC
+  0xB0 0xB1 0xB2 0xB3 0xB4 0xB5     // MAC bytes
+```
 
 ---
 
 ### `SelfReport` — Command ID `0xFF`, Flag = `0x01`
+
+Sent as a reply to `QueryDevices`. Provides device metadata.
+
+#### Payload Format
 
 | Byte Index | Field             | Type        | Notes |
 |------------|-------------------|-------------|-------|
@@ -89,21 +97,16 @@ Payload:
 | +1         | Command Count     | `uint8_t`   | How many commands follow   |
 | +2         | Command IDs       | `uint8_t[M]`| List of supported commands |
 
-#### Example: response from `"Torch-3"` with two commands supported
-
+#### Example: response from "Torch-3" with two commands supported
 ```
-Command ID: 0xFF
-Flag: 0x01
-Request ID: 0x1234
-Payload:
-01 02 // Device A + B
-01 00 07 // Version 1.0.7
-07 // Name length
-'T' 'o' 'r' 'c' 'h' '-' '3'
-02 // Two supported commands
-0x10 0x11 // Command IDs
+Full Payload:
+  0x01 0x02                      // Device A + B
+  0x01 0x00 0x07                 // Version: 1.0.7
+  0x07                          // Name length = 7
+  0x54 0x6F 0x72 0x63 0x68 0x2D 0x33   // 'T''o''r''c''h''-''3'
+  0x02                          // 2 supported commands
+  0x10 0x11                     // Command IDs
 ```
-
 
 ---
 
@@ -129,20 +132,23 @@ Payload:
 
 #### Example: Brightness GET
 ```
-EQW 0x11 0x00 0x12 0x34
-(no payload)
+Header:
+  0x45 0x51 0x57  0x11  0x00  0x12 0x34
+Payload:
+  (none)
 ```
-
 
 #### Example: Brightness SET w/ ACK
 ```
-EQW 0x11 0x03 0xAB 0xCD 0xC8
-// Set brightness to 200, expect reply with same requestId
+Header:
+  0x45 0x51 0x57  0x11  0x03  0xAB 0xCD
+Payload:
+  0xC8            // Brightness = 200
 ```
-
 
 ---
 
 ## Summary
 
 The EQW protocol defines a 7-byte fixed header and flexible payload structure. Flags are used to distinguish between command types, and all packets are request-response compatible. System commands use `Command ID = 255`, and the protocol is designed for size-constrained, real-time embedded use with FreeRTOS in ESP-NOW environments.
+
