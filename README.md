@@ -57,8 +57,8 @@ Allows querying all devices or filtering by Device ID pairs (A+B) and/or specifi
 
 | Byte Index | Field           | Type           | Notes                         |
 |------------|-----------------|----------------|-------------------------------|
-| 7          | Device ID Count | `uint8_t`      | N device type pairs to follow |
-| 8..        | Device ID List  | `uint8_t[N*2]` | Each pair = A, B bytes        |
+| 7          | Device Type ID Count | `uint8_t`      | N device type pairs to follow |
+| 8..        | Device Type ID List  | `uint8_t[N*2]` | Each pair = A, B bytes        |
 | ..         | MAC Count       | `uint8_t`      | M MACs follow                 |
 | ..         | MACs            | `uint8_t[M*6]` | Each 6 bytes                  |
 
