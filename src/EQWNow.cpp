@@ -89,12 +89,23 @@ uint16_t EQWNow::request(const uint8_t* mac,
     if (!send(mac, commandId, flag, payload, len, id)) {
         return 0;
     }
-    pendingReplies[id] = replyCb;
+    PendingReply pr;
+    pr.cb = replyCb;
+    pr.timestamp = millis();
+    pendingReplies[id] = pr;
     return id;
 }
 
 void EQWNow::process() {
     if (!rxQueue) return;
+    uint32_t now = millis();
+    for (auto it = pendingReplies.begin(); it != pendingReplies.end();) {
+        if (now - it->second.timestamp > pendingReplyTimeoutMs) {
+            it = pendingReplies.erase(it);
+        } else {
+            ++it;
+        }
+    }
     QueuedMessage msg;
     while (xQueueReceive(rxQueue, &msg, 0) == pdTRUE) {
         if (msg.len < 7) continue;
@@ -107,7 +118,7 @@ void EQWNow::process() {
 
         auto pending = pendingReplies.find(requestId);
         if (pending != pendingReplies.end()) {
-            pending->second(msg.mac, payload, len, flag, requestId);
+            pending->second.cb(msg.mac, payload, len, flag, requestId);
             pendingReplies.erase(pending);
             continue;
         }
