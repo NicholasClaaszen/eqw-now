@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <string>
-#include <map>
 
 struct EQWCommandEntry {
     const char* name;
@@ -34,20 +33,11 @@ static const EQWCommandEntry kEQWCommandTable[] = {
     {"SDSpace", 0x91},
     {"FileList", 0x92},
     {"Macro", 0xC8},
+
 };
 
-inline uint8_t eqwCommandIdForName(const std::string& name) {
-    for (const auto& entry : kEQWCommandTable) {
-        if (name == entry.name) return entry.id;
-    }
-    return 0xFF;
-}
-
-inline const char* eqwCommandNameForId(uint8_t id) {
-    for (const auto& entry : kEQWCommandTable) {
-        if (id == entry.id) return entry.name;
-    }
-    return nullptr;
-}
+uint8_t eqwCommandIdForName(const std::string& name);
+const char* eqwCommandNameForId(uint8_t id);
+uint8_t defineUserCommand(const std::string& name);
 
 #endif // EQW_COMMANDS_H
