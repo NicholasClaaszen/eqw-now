@@ -152,3 +152,34 @@ Payload:
 The EQW protocol defines a 7-byte fixed header and flexible payload structure. Flags are used to distinguish between command types, and all packets are request-response compatible. System discovery and self-reporting operate via Command `0x00`, and all other functionality builds modularly on top of this structure.
 
 Designed for real-time FreeRTOS use in LARP or embedded ESP-NOW environments.
+
+---
+
+## PlatformIO Library Usage
+
+This repository includes a minimal reference implementation of the EQWNow library. Add it as a dependency in `platformio.ini`:
+
+```ini
+lib_deps =
+    https://github.com/yourname/eqw-now.git
+```
+
+Include the header and initialize the library:
+
+```cpp
+#include <EQWNow.h>
+
+EQWNow eqw;
+
+void setup() {
+    eqw.begin("DeviceName", 0x01, 0x02, 1, 0, 0);
+}
+```
+
+The library automatically tracks commands registered via `on()` and advertises
+them in its `SelfReport` reply to `QueryDevices`. Use `on("Power", handler)` to
+register handlers by name or `on(0x01, handler)` for direct IDs. Besides
+`send()` for fire-and-forget messages, `request()` allows sending a packet and
+supplying a callback to handle the reply when it arrives. All incoming packets
+are queued internally and processed in `EQWNow::process()` so callbacks execute
+from your main loop rather than the Wi‑Fi driver task.
