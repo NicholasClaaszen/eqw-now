@@ -1,0 +1,8 @@
+{
+  "name": "EQWNow",
+  "version": "0.1.0",
+  "description": "EQW Protocol library for ESP-NOW communication.",
+  "keywords": ["eqw", "esp-now"],
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}
