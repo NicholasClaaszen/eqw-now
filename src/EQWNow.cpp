@@ -122,6 +122,38 @@ void EQWNow::process() {
 }
 
 bool EQWNow::sendSelfReport(const uint8_t* mac, uint16_t requestId) {
+    const size_t maxLen = EQW_MAX_PAYLOAD_LEN;
+
+    // calculate lengths with potential truncation
+    size_t nameLen = strnlen(info.name, EQW_MAX_NAME_LEN);
+    size_t cmdCount = registeredCommands.size();
+    size_t payloadLen = 5 + 1 + nameLen + 1 + cmdCount;
+
+    if (payloadLen > maxLen) {
+        // try truncating the command list first
+        size_t maxCmds = maxLen - (5 + 1 + nameLen + 1);
+        if ((int)maxCmds < 0) maxCmds = 0;
+        if (cmdCount > maxCmds) {
+            cmdCount = maxCmds;
+        }
+        payloadLen = 5 + 1 + nameLen + 1 + cmdCount;
+    }
+
+    if (payloadLen > maxLen) {
+        // truncate name if still too long
+        size_t maxName = maxLen - (5 + 1 + 1 + cmdCount);
+        if ((int)maxName < 0) maxName = 0;
+        if (nameLen > maxName) {
+            nameLen = maxName;
+        }
+        payloadLen = 5 + 1 + nameLen + 1 + cmdCount;
+    }
+
+    if (payloadLen > maxLen) {
+        // even after truncation it's too big
+        return false;
+    }
+
     uint8_t payload[256];
     size_t idx = 0;
     payload[idx++] = info.deviceByteA;
@@ -129,14 +161,16 @@ bool EQWNow::sendSelfReport(const uint8_t* mac, uint16_t requestId) {
     payload[idx++] = info.versionMajor;
     payload[idx++] = info.versionMinor;
     payload[idx++] = info.versionPatch;
-    uint8_t nameLen = strnlen(info.name, EQW_MAX_NAME_LEN);
-    payload[idx++] = nameLen;
+    payload[idx++] = static_cast<uint8_t>(nameLen);
     memcpy(payload + idx, info.name, nameLen);
     idx += nameLen;
-    payload[idx++] = registeredCommands.size();
+    payload[idx++] = static_cast<uint8_t>(cmdCount);
+    size_t count = 0;
     for (uint8_t cmd : registeredCommands) {
+        if (count++ >= cmdCount) break;
         payload[idx++] = cmd;
     }
+
     return send(mac, 0x00, 0x01, payload, idx, requestId);
 }
 

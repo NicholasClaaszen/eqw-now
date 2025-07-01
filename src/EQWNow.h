@@ -12,6 +12,7 @@
 #include <freertos/queue.h>
 
 const size_t EQW_MAX_NAME_LEN = 32;
+const size_t EQW_MAX_PAYLOAD_LEN = 243; // max bytes allowed for payload in send()
 
 struct EQWDeviceInfo {
     uint8_t deviceByteA = 0;
