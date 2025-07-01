@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <array>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
@@ -23,9 +24,16 @@ struct EQWDeviceInfo {
     char name[EQW_MAX_NAME_LEN + 1] = {};
 };
 
+struct EQWPeerRecord {
+    uint8_t mac[6];
+    EQWDeviceInfo info;
+    std::vector<uint8_t> supportedCommands;
+};
+
 class EQWNow {
 public:
     using ReceiveCallback = std::function<void(const uint8_t*, const uint8_t*, size_t, uint8_t, uint16_t)>;
+    using SelfReportCallback = std::function<void(const EQWPeerRecord&, uint16_t)>;
 
     EQWNow();
 
@@ -53,6 +61,14 @@ public:
                      size_t len,
                      ReceiveCallback replyCb);
 
+    uint16_t queryDevices(const uint8_t* mac,
+                          const std::vector<std::pair<uint8_t, uint8_t>>& deviceIds = {},
+                          const std::vector<std::array<uint8_t, 6>>& macs = {});
+
+    void onSelfReport(SelfReportCallback cb);
+    void storePeer(const EQWPeerRecord& peer);
+    bool getPeer(const uint8_t* mac, EQWPeerRecord& out) const;
+    std::vector<EQWPeerRecord> getPeers() const;
     void setPendingReplyTimeout(uint32_t timeoutMs) { pendingReplyTimeoutMs = timeoutMs; }
 
     void process();
@@ -81,6 +97,9 @@ private:
 
     std::set<uint8_t> registeredCommands;
     EQWDeviceInfo info;
+
+    std::map<std::array<uint8_t, 6>, EQWPeerRecord> peers;
+    SelfReportCallback selfReportCb = nullptr;
 
     QueueHandle_t rxQueue = nullptr;
 

@@ -10,11 +10,12 @@ void setup() {
         Serial.println("Power command received");
     });
 
+    eqw.onSelfReport([](const EQWPeerRecord& peer, uint16_t) {
+        Serial.printf("Discovered: %s\n", peer.info.name);
+    });
+
     uint8_t broadcast[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-    eqw.request(broadcast, eqwCommandIdForName("Battery"), 0x00, nullptr, 0,
-                [](const uint8_t*, const uint8_t* payload, size_t len, uint8_t, uint16_t) {
-                    if (len) Serial.printf("Battery level: %u\n", payload[0]);
-                });
+    eqw.queryDevices(broadcast);
 }
 
 void loop() {
