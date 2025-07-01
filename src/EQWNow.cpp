@@ -1,6 +1,8 @@
 #include "EQWNow.h"
 #include "EQWCommands.h"
 
+static const uint8_t kEQWPrefix[3] = {0x45, 0x51, 0x57};
+
 EQWNow* EQWNow::instance = nullptr;
 
 EQWNow::EQWNow() { instance = this; }
@@ -64,9 +66,9 @@ bool EQWNow::send(const uint8_t* mac,
 
     uint8_t packet[250];
     size_t idx = 0;
-    packet[idx++] = 0x45;
-    packet[idx++] = 0x51;
-    packet[idx++] = 0x57;
+    packet[idx++] = kEQWPrefix[0];
+    packet[idx++] = kEQWPrefix[1];
+    packet[idx++] = kEQWPrefix[2];
     packet[idx++] = commandId;
     packet[idx++] = flag;
     packet[idx++] = requestId >> 8;
@@ -98,6 +100,11 @@ void EQWNow::process() {
     QueuedMessage msg;
     while (xQueueReceive(rxQueue, &msg, 0) == pdTRUE) {
         if (msg.len < 7) continue;
+        if (msg.data[0] != kEQWPrefix[0] ||
+            msg.data[1] != kEQWPrefix[1] ||
+            msg.data[2] != kEQWPrefix[2]) {
+            continue;
+        }
 
         uint8_t commandId = msg.data[3];
         uint8_t flag = msg.data[4];
