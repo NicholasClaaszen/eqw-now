@@ -69,7 +69,6 @@ public:
     void storePeer(const EQWPeerRecord& peer);
     bool getPeer(const uint8_t* mac, EQWPeerRecord& out) const;
     std::vector<EQWPeerRecord> getPeers() const;
-
     void setPendingReplyTimeout(uint32_t timeoutMs) { pendingReplyTimeoutMs = timeoutMs; }
 
     void process();

@@ -183,5 +183,7 @@ register handlers by name or `on(0x01, handler)` for direct IDs. Besides
 supplying a callback to handle the reply when it arrives. All incoming packets
 are queued internally and processed in `EQWNow::process()` so callbacks execute
 from your main loop rather than the Wi‑Fi driver task. Pending reply handlers
-expire after a timeout (10\xa0seconds by default) which can be changed via
+
+expire after a timeout (10&nbsp;seconds by default) which can be changed via
+
 `setPendingReplyTimeout()`.
