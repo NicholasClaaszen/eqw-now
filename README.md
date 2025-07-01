@@ -178,5 +178,8 @@ void setup() {
 
 The library automatically tracks commands registered via `on()` and advertises
 them in its `SelfReport` reply to `QueryDevices`. Use `on("Power", handler)` to
-register handlers by name or `on(0x01, handler)` for direct IDs. The implementation
-currently exposes `begin()`, `on()`, `send()` and automatic self-report handling.
+register handlers by name or `on(0x01, handler)` for direct IDs. Besides
+`send()` for fire-and-forget messages, `request()` allows sending a packet and
+supplying a callback to handle the reply when it arrives. All incoming packets
+are queued internally and processed in `EQWNow::process()` so callbacks execute
+from your main loop rather than the Wi‑Fi driver task.

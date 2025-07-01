@@ -6,8 +6,10 @@
 #include <functional>
 #include <map>
 #include <set>
-#include <vector>
 #include <string>
+#include <vector>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 const size_t EQW_MAX_NAME_LEN = 32;
 
@@ -43,6 +45,13 @@ public:
               size_t len,
               uint16_t requestId = 0);
 
+    uint16_t request(const uint8_t* mac,
+                     uint8_t commandId,
+                     uint8_t flag,
+                     const uint8_t* payload,
+                     size_t len,
+                     ReceiveCallback replyCb);
+
     void process();
 
 private:
@@ -59,8 +68,19 @@ private:
     static EQWNow* instance;
 
     std::map<uint8_t, ReceiveCallback> callbacks;
+    std::map<uint16_t, ReceiveCallback> pendingReplies;
+    uint16_t nextRequestId = 1;
+
     std::set<uint8_t> registeredCommands;
     EQWDeviceInfo info;
+
+    QueueHandle_t rxQueue = nullptr;
+
+    struct QueuedMessage {
+        uint8_t mac[6];
+        uint8_t data[250];
+        uint8_t len;
+    };
 };
 
 #endif // EQW_NOW_H

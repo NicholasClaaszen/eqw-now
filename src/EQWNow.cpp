@@ -3,9 +3,7 @@
 
 EQWNow* EQWNow::instance = nullptr;
 
-EQWNow::EQWNow() {
-    instance = this;
-}
+EQWNow::EQWNow() { instance = this; }
 
 bool EQWNow::begin(const char* name,
                    uint8_t deviceA,
@@ -21,6 +19,11 @@ bool EQWNow::begin(const char* name,
     info.versionPatch = verPatch;
 
     if (esp_now_init() != ESP_OK) {
+        return false;
+    }
+
+    rxQueue = xQueueCreate(10, sizeof(QueuedMessage));
+    if (!rxQueue) {
         return false;
     }
 
@@ -75,8 +78,47 @@ bool EQWNow::send(const uint8_t* mac,
     return esp_now_send(mac, packet, idx) == ESP_OK;
 }
 
+uint16_t EQWNow::request(const uint8_t* mac,
+                         uint8_t commandId,
+                         uint8_t flag,
+                         const uint8_t* payload,
+                         size_t len,
+                         ReceiveCallback replyCb) {
+    uint16_t id = nextRequestId++;
+    if (id == 0) id = nextRequestId++; // avoid 0
+    if (!send(mac, commandId, flag, payload, len, id)) {
+        return 0;
+    }
+    pendingReplies[id] = replyCb;
+    return id;
+}
+
 void EQWNow::process() {
-    // placeholder for async tasks
+    if (!rxQueue) return;
+    QueuedMessage msg;
+    while (xQueueReceive(rxQueue, &msg, 0) == pdTRUE) {
+        if (msg.len < 7) continue;
+
+        uint8_t commandId = msg.data[3];
+        uint8_t flag = msg.data[4];
+        uint16_t requestId = (msg.data[5] << 8) | msg.data[6];
+        const uint8_t* payload = msg.data + 7;
+        size_t len = msg.len - 7;
+
+        auto pending = pendingReplies.find(requestId);
+        if (pending != pendingReplies.end()) {
+            pending->second(msg.mac, payload, len, flag, requestId);
+            pendingReplies.erase(pending);
+            continue;
+        }
+
+        auto it = callbacks.find(commandId);
+        if (it != callbacks.end()) {
+            it->second(msg.mac, payload, len, flag, requestId);
+        } else if (commandId == 0x00) {
+            handleSystemCommand(msg.mac, payload, len, flag, requestId);
+        }
+    }
 }
 
 bool EQWNow::sendSelfReport(const uint8_t* mac, uint16_t requestId) {
@@ -109,17 +151,12 @@ void EQWNow::handleSystemCommand(const uint8_t* mac,
 }
 
 void EQWNow::onDataRecv(const uint8_t* mac, const uint8_t* data, int len) {
-    if (!instance || len < 7) return;
-
-    uint8_t commandId = data[3];
-    uint8_t flag = data[4];
-    uint16_t requestId = (data[5] << 8) | data[6];
-    auto it = instance->callbacks.find(commandId);
-    if (it != instance->callbacks.end()) {
-        it->second(mac, data + 7, len - 7, flag, requestId);
-    } else if (commandId == 0x00) {
-        instance->handleSystemCommand(mac, data + 7, len - 7, flag, requestId);
-    }
+    if (!instance || !instance->rxQueue || len <= 0) return;
+    QueuedMessage msg;
+    memcpy(msg.mac, mac, 6);
+    msg.len = len > 250 ? 250 : len;
+    memcpy(msg.data, data, msg.len);
+    xQueueSend(instance->rxQueue, &msg, 0);
 }
 
 void EQWNow::onDataSent(const uint8_t* mac, esp_now_send_status_t status) {
