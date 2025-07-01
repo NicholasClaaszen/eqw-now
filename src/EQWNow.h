@@ -53,6 +53,8 @@ public:
                      size_t len,
                      ReceiveCallback replyCb);
 
+    void setPendingReplyTimeout(uint32_t timeoutMs) { pendingReplyTimeoutMs = timeoutMs; }
+
     void process();
 
 private:
@@ -69,7 +71,12 @@ private:
     static EQWNow* instance;
 
     std::map<uint8_t, ReceiveCallback> callbacks;
-    std::map<uint16_t, ReceiveCallback> pendingReplies;
+    struct PendingReply {
+        ReceiveCallback cb;
+        uint32_t timestamp;
+    };
+    std::map<uint16_t, PendingReply> pendingReplies;
+    uint32_t pendingReplyTimeoutMs = 10000;
     uint16_t nextRequestId = 1;
 
     std::set<uint8_t> registeredCommands;
