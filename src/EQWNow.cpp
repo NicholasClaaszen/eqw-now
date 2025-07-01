@@ -3,6 +3,12 @@
 
 EQWNow* EQWNow::instance = nullptr;
 
+static std::array<uint8_t, 6> macToArray(const uint8_t* mac) {
+    std::array<uint8_t, 6> arr{};
+    if (mac) memcpy(arr.data(), mac, 6);
+    return arr;
+}
+
 EQWNow::EQWNow() { instance = this; }
 
 bool EQWNow::begin(const char* name,
@@ -93,6 +99,47 @@ uint16_t EQWNow::request(const uint8_t* mac,
     return id;
 }
 
+void EQWNow::onSelfReport(SelfReportCallback cb) { selfReportCb = cb; }
+
+void EQWNow::storePeer(const EQWPeerRecord& peer) {
+    peers[macToArray(peer.mac)] = peer;
+}
+
+bool EQWNow::getPeer(const uint8_t* mac, EQWPeerRecord& out) const {
+    auto it = peers.find(macToArray(mac));
+    if (it == peers.end()) return false;
+    out = it->second;
+    return true;
+}
+
+std::vector<EQWPeerRecord> EQWNow::getPeers() const {
+    std::vector<EQWPeerRecord> v;
+    for (const auto& kv : peers) v.push_back(kv.second);
+    return v;
+}
+
+uint16_t EQWNow::queryDevices(
+    const uint8_t* mac,
+    const std::vector<std::pair<uint8_t, uint8_t>>& deviceIds,
+    const std::vector<std::array<uint8_t, 6>>& macs) {
+    uint8_t payload[64];
+    size_t idx = 0;
+    payload[idx++] = deviceIds.size();
+    for (const auto& p : deviceIds) {
+        payload[idx++] = p.first;
+        payload[idx++] = p.second;
+    }
+    payload[idx++] = macs.size();
+    for (const auto& m : macs) {
+        memcpy(payload + idx, m.data(), 6);
+        idx += 6;
+    }
+    return request(mac, 0x00, 0x00, payload, idx,
+                   [this](const uint8_t* mac, const uint8_t* payload, size_t len, uint8_t flag, uint16_t id) {
+                       handleSystemCommand(mac, payload, len, flag, id);
+                   });
+}
+
 void EQWNow::process() {
     if (!rxQueue) return;
     QueuedMessage msg;
@@ -147,6 +194,27 @@ void EQWNow::handleSystemCommand(const uint8_t* mac,
                                  uint16_t requestId) {
     if (flag == 0x00) {
         sendSelfReport(mac, requestId);
+    } else if (flag == 0x01 && payload && len >= 6) {
+        EQWPeerRecord peer{};
+        memcpy(peer.mac, mac, 6);
+        size_t idx = 0;
+        peer.info.deviceByteA = payload[idx++];
+        peer.info.deviceByteB = payload[idx++];
+        peer.info.versionMajor = payload[idx++];
+        peer.info.versionMinor = payload[idx++];
+        peer.info.versionPatch = payload[idx++];
+        if (idx >= len) return;
+        uint8_t nameLen = payload[idx++];
+        if (nameLen > EQW_MAX_NAME_LEN || idx + nameLen > len) return;
+        memcpy(peer.info.name, payload + idx, nameLen);
+        peer.info.name[nameLen] = '\0';
+        idx += nameLen;
+        if (idx >= len) return;
+        uint8_t cmdCount = payload[idx++];
+        for (uint8_t i = 0; i < cmdCount && idx < len; ++i) {
+            peer.supportedCommands.push_back(payload[idx++]);
+        }
+        if (selfReportCb) selfReportCb(peer, requestId);
     }
 }
 
