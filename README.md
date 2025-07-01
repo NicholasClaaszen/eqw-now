@@ -176,5 +176,7 @@ void setup() {
 }
 ```
 
-The implementation currently exposes `begin()`, `on()` and `send()` helpers.
-Functionality will expand in future versions.
+The library automatically tracks commands registered via `on()` and advertises
+them in its `SelfReport` reply to `QueryDevices`. Use `on("Power", handler)` to
+register handlers by name or `on(0x01, handler)` for direct IDs. The implementation
+currently exposes `begin()`, `on()`, `send()` and automatic self-report handling.

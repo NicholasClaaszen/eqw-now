@@ -5,6 +5,9 @@
 #include <esp_now.h>
 #include <functional>
 #include <map>
+#include <set>
+#include <vector>
+#include <string>
 
 const size_t EQW_MAX_NAME_LEN = 32;
 
@@ -31,6 +34,7 @@ public:
                uint8_t verPatch);
 
     void on(uint8_t commandId, ReceiveCallback cb);
+    void on(const char* commandName, ReceiveCallback cb);
 
     bool send(const uint8_t* mac,
               uint8_t commandId,
@@ -45,9 +49,17 @@ private:
     static void onDataRecv(const uint8_t* mac, const uint8_t* data, int len);
     static void onDataSent(const uint8_t* mac, esp_now_send_status_t status);
 
+    bool sendSelfReport(const uint8_t* mac, uint16_t requestId);
+    void handleSystemCommand(const uint8_t* mac,
+                             const uint8_t* payload,
+                             size_t len,
+                             uint8_t flag,
+                             uint16_t requestId);
+
     static EQWNow* instance;
 
     std::map<uint8_t, ReceiveCallback> callbacks;
+    std::set<uint8_t> registeredCommands;
     EQWDeviceInfo info;
 };
 
